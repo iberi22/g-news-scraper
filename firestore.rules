@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow public read access to news articles
+    match /google_news_articles/{articleId} {
+      allow read: if true;
+      // Deny writes by default for public access.
+      // Writes should only be allowed via authenticated service account (Cloud Run)
+      // More granular rules can be added later if specific user auth is needed.
+      allow write: if false; // Keep writes restricted by default
+    }
+
+    // Default deny for any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

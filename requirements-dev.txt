@@ -1,0 +1,6 @@
+# Development/Testing Dependencies
+pytest>=7.0,<8.0
+black>=23.0,<25.0
+flake8>=6.0,<7.0
+# Alternatively, use ruff:
+# ruff>=0.1,<0.2

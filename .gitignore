@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+virtualenv/
+venv/
+ENV/
+env/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+firebase-debug.log*
+
+# IDE / Editor specific
+.vscode/
+.idea/
+.idx/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Other
+.DS_Store

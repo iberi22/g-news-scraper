@@ -1,0 +1,4 @@
+[flake8]
+ignore = E203, E501, W503  # Example ignores: whitespace before ':', line too long (handled by black), line break before binary operator
+max-line-length = 88
+exclude = .venv,__pycache__,.git,.hg,.svn,build,dist
