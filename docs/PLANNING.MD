@@ -1,4 +1,4 @@
-# PLANNING.md - Planificación del Proyecto API Scraping Google News (NVP)
+# PLANNING.md - Planificación del Proyecto API Scraping RSS Feeds (NVP)
 
 **Propósito:** Este documento describe el *qué* y el *cómo* del proyecto: objetivos, arquitectura, stack tecnológico, modelos de datos, APIs y restricciones clave. Sirve como la referencia principal para entender el producto a construir.
 
@@ -6,76 +6,64 @@
 
 **1. Resumen del Proyecto y Objetivos:**
 
-*   **Producto:** API RESTful en Python para scrapear periódicamente Google News.
-*   **Objetivo NVP:** Implementar la funcionalidad básica de scraping programado de Google News, almacenamiento de artículos *nuevos* (metadata) en Firestore y un endpoint para consultar los artículos recientes.
-*   **Enfoque:** NVP funcional, rápido de implementar, escalable y **extremadamente consciente de los costos**.
+*   **Producto:** API RESTful in Python for scraping RSS Feeds.
+*   **Objetivo NVP:** Implement the basic functionality of scheduled scraping of RSS Feeds, storing article (metadata) in Firestore, and an endpoint to query the recent articles.
+*   **Enfoque:** Functional NVP, fast to implement, scalable, and **extremely cost-conscious**.
 
-**2. Restricción Crítica Obligatoria:**
+**2. Crítica Obligatoria de Restricción:**
 
-*   **GCP Free Tier:** **Todas las decisiones de diseño e implementación deben priorizar mantenerse dentro de los límites gratuitos de Google Cloud Platform (Cloud Run, Cloud Scheduler, Firestore, Logging).** Monitorizar activamente el consumo.
+*   **GCP Free Tier:** **All design and implementation decisions should prioritize staying within the free limits of Google Cloud Platform (Cloud Run, Cloud Scheduler, Firestore, Logging).** Actively monitor consumption.
 
 **3. Stack Tecnológico Obligatorio:**
 
 *   **API:** Python + **Flask**
-*   **Base de Datos:** **Firestore (Modo Nativo)**
-*   **Entorno de Ejecución:** Google Cloud Run (contenedorizado)
-*   **Programación:** Google Cloud Scheduler
+*   **Base de Datos:** **Firestore (Native Mode)**
+*   **Entorno de Ejecución:** Google Cloud Run (Containerized)
+*   **Programación:** Google Cloud Scheduler (Potentially)
 *   **Contenerización:** Docker
-*   **Scraping:** `requests` (o `httpx`), `beautifulsoup4`
+*   **Scraping:** `feedparser`
 *   **GCP SDK:** `google-cloud-firestore`
 
 **4. Arquitectura Propuesta:**
 
 *   **Cloud Run Service (Flask App):**
-    *   Contiene la API Flask.
-    *   Recibe llamadas API públicas (GET /news/google).
-    *   Recibe llamadas internas del Scheduler (POST /tasks/scrape/google-news).
-    *   Configuración: Min Instances = 0, recursos mínimos, timeout adecuado.
-*   **Cloud Scheduler Job:**
-    *   Disparador: Cron (ej. `0 * * * *` - cada hora).
-    *   Target: HTTP POST al endpoint `/tasks/scrape/google-news` del servicio Cloud Run.
-    *   Autenticación: Verificar header `X-CloudScheduler` o usar OIDC.
+    *   Contains the Flask API.
+    *   Receives public API calls (POST /scrape).
+    *   Configuration: Min Instances = 0, minimum resources, appropriate timeout.
 *   **Firestore Database:**
-    *   Almacena metadata de artículos scrapeados.
-    *   Requiere configuración de **Firestore Security Rules**.
+    *   Stores scraped article metadata.
+    *   Requires Firestore Security Rules configuration.
 
 **5. Modelo de Datos Firestore:**
 
-*   **Colección: `google_news_articles`**
-    *   **Document ID:** Derivado del `article_url` (hasheado/transformado) o UUID. Clave para check de duplicados.
-    *   **Campos:**
-        *   `article_url`: string (URL original, indexado).
+*   **Collection:** `articles`
+    *   **Document ID:** Derived from `article_url` (hashed/transformed) or UUID. Key for duplicate checking.
+    *   **Fields:**
+        *   `article_url`: string (original URL, indexed).
         *   `title`: string.
         *   `source_name`: string.
-        *   `snippet`: string (nullable).
-        *   `google_news_url`: string (nullable).
-        *   `scraped_at`: timestamp (indexado para ordenar).
+        *   `summary`: string (nullable).
+        *   `scraped_at`: timestamp (indexed for ordering).
 *   **Índices Necesarios:**
-    *   Para check de existencia por `article_url`.
-    *   Para ordenar/filtrar por `scraped_at` (descendente).
-*   **Reglas de Seguridad (Firestore Security Rules):** Definir para permitir lecturas (públicas o autenticadas) y escrituras solo desde el servicio Cloud Run.
+    *   For existence check by `article_url`.
+    *   To order/filter by `scraped_at` (descending).
+*   **Reglas de Seguridad (Firestore Security Rules):** Define to allow reads (public or authenticated) and writes only from the Cloud Run service.
 
 **6. API Endpoints (Flask):**
 
-*   **`POST /tasks/scrape/google-news`**
-    *   **Lógica:** Valida origen (Scheduler), ejecuta scraping de Google News, parsea HTML, verifica existencia de cada artículo en Firestore (por `article_url`), escribe documento en Firestore **solo si es nuevo**.
-    *   **Seguridad:** Requiere validación de origen (Cloud Scheduler).
-*   **`GET /news/google`**
-    *   **Lógica:** Consulta Firestore (`google_news_articles`), ordena por `scraped_at` desc, aplica paginación (opcional), devuelve lista de artículos (metadata).
-    *   **Seguridad:** Accesible públicamente (o según se defina en Security Rules).
+*   **`POST /scrape`**
+    *   **Logic:** Receives an array of RSS Feed URLs, iterates over each URL, parses the RSS feed, extracts the metadata of each article, verifies the existence of the article in Firestore (by `article_url`), and writes a document to Firestore only if it is new.
+    *   **Security:** Publicly accessible (or as defined in Security Rules).
 
-**7. Lógica de Scraping (Detalles):**
+**7. Logic de Scraping (Details):**
 
-*   Realizar GET a Google News (URL específica).
-*   Usar BeautifulSoup para parsear. **Identificar selectores CSS robustos** para títulos, enlaces, fuentes, snippets (sujeto a cambios por parte de Google).
-*   Extraer datos limpios.
-*   **Verificación de Duplicados:** Antes de escribir en Firestore, hacer una consulta (`.where('article_url', '==', url).limit(1).get()`) para ver si ya existe. **Esto es crucial.**
-*   Manejar errores de red, parsing y base de datos.
-*   Ser respetuoso (delays si es necesario, ajustar frecuencia scheduler).
+*   Use `feedparser` to parse RSS feeds.
+*   Extract clean data (title, link, description, etc.).
+*   **Duplicate Check:** Before writing to Firestore, make a query to see if it already exists.
+*   Handle network, parsing, and database errors.
 
-**8. Consideraciones Free Tier (Recordatorio):**
+**8. Free Tier Considerations (Reminder):**
 
-*   **Firestore:** Principal punto de consumo (lecturas para check, escrituras para nuevos). Optimizar consulta de existencia. Limitar frecuencia de scrapeo.
-*   **Cloud Run:** CPU/Memoria durante ejecución del scraper y atención de API. Mantener `min-instances=0`.
-*   **Scheduler:** 1 job entra en el límite gratuito.
-*   **Logging:** Ser consciente del volumen de logs generados.
+*   **Firestore:** Main point of consumption (reads for checking, writes for new ones). Optimize existence query. Limit frequency of scraping.
+*   **Cloud Run:** CPU/Memory during scraper execution and API attention. Keep `min-instances=0`.
+*   **Logging:** Be aware of the volume of logs generated.
