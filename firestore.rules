@@ -1,13 +1,18 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow public read access to news articles
+    // Colección principal de artículos
     match /google_news_articles/{articleId} {
+      // Permitir lectura pública (necesario para el MVP)
       allow read: if true;
-      // Deny writes by default for public access.
-      // Writes should only be allowed via authenticated service account (Cloud Run)
-      // More granular rules can be added later if specific user auth is needed.
-      allow write: if false; // Keep writes restricted by default
+      // Permitir escritura desde el servicio Cloud Run
+      allow write: if true;  // Para el MVP, permitimos escritura. En producción deberías restringir esto.
+    }
+
+    // Configuraciones de usuario (si se implementa)
+    match /user_configs/{userId} {
+      allow read: if true;  // MVP: Permitir lectura de configuraciones
+      allow write: if false; // MVP: No permitir modificaciones de configuración por ahora
     }
 
     // Default deny for any other collections
